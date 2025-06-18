@@ -336,7 +336,7 @@ export const ABTestInterface: React.FC<ABTestInterfaceProps> = ({
               {new Date(message.timestamp).toLocaleTimeString()}
             </span>
           </div>
-          <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
+          <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed break-words overflow-wrap-anywhere">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.content}
             </ReactMarkdown>
@@ -425,17 +425,19 @@ export const ABTestInterface: React.FC<ABTestInterfaceProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-white overflow-hidden w-full max-w-full min-w-0">
       {/* Header */}
-      <div className="border-b border-gray-200 p-4 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">A/B Test</h1>
-            <p className="text-sm text-gray-500">
+      <div className="border-b border-gray-200 p-4 flex-shrink-0 min-w-0">
+        <div className="flex items-center justify-between min-w-0">
+          <div className="min-w-0 flex-shrink">
+            <h1 className="text-xl font-semibold text-gray-900 truncate">
+              A/B Test - {selectedPrompt?.name}
+            </h1>
+            <p className="text-sm text-gray-500 truncate">
               Compare responses from different models
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <Button
               variant="outline"
               size="sm"
@@ -456,9 +458,9 @@ export const ABTestInterface: React.FC<ABTestInterfaceProps> = ({
       </div>
 
       {/* Split View */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 overflow-hidden w-full">
         {/* Left Side */}
-        <div className="flex-1 flex flex-col border-r border-gray-200 min-h-0">
+        <div className="w-1/2 flex flex-col border-r border-gray-200 min-h-0 overflow-hidden min-w-0">
           {renderModelSelector("left", leftConfig, "Model A")}
           {renderMessages(leftResult, leftConfig, leftMessagesEndRef)}
           {leftResult.error && (
@@ -472,7 +474,7 @@ export const ABTestInterface: React.FC<ABTestInterfaceProps> = ({
         </div>
 
         {/* Right Side */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="w-1/2 flex flex-col min-h-0 overflow-hidden min-w-0">
           {renderModelSelector("right", rightConfig, "Model B")}
           {renderMessages(rightResult, rightConfig, rightMessagesEndRef)}
           {rightResult.error && (
@@ -487,9 +489,9 @@ export const ABTestInterface: React.FC<ABTestInterfaceProps> = ({
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 p-4 flex-shrink-0">
-        <form onSubmit={handleSubmit} className="flex gap-2 items-end">
-          <div className="flex-1 relative">
+      <div className="border-t border-gray-200 p-4 flex-shrink-0 min-w-0">
+        <form onSubmit={handleSubmit} className="flex gap-2 items-end min-w-0">
+          <div className="flex-1 relative min-w-0">
             <textarea
               ref={textareaRef}
               value={input}

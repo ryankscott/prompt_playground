@@ -36,6 +36,9 @@ body {
   padding: 0.75rem;
   overflow-x: auto;
   margin: 0.5rem 0;
+  max-width: 100%;
+  word-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .prose pre code {
@@ -43,32 +46,29 @@ body {
   padding: 0;
   border-radius: 0;
   font-size: 0.875rem;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+/* Ensure all prose content respects container boundaries */
+.prose * {
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .prose table {
   border-collapse: collapse;
   width: 100%;
   margin: 0.5rem 0;
+  table-layout: fixed;
 }
 
-.prose th,
-.prose td {
-  border: 1px solid rgb(209 213 219);
-  padding: 0.5rem;
-  text-align: left;
-}
-
-.prose th {
-  background: rgb(249 250 251);
-  font-weight: 600;
-}
-
-.prose blockquote {
-  border-left: 4px solid rgb(209 213 219);
-  padding-left: 1rem;
-  margin: 0.5rem 0;
-  font-style: italic;
-  color: rgb(107 114 128);
+.prose table td,
+.prose table th {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 0;
 }
 
 .line-clamp-2 {
