@@ -6,9 +6,8 @@ import {
   Download,
   Upload,
   MessageSquarePlus,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { Prompt } from "../types";
 import { CreatePromptDialog } from "./CreatePromptDialog";
 
@@ -23,7 +22,6 @@ interface PromptSidebarProps {
   onImportPrompts: () => Promise<number>;
   onStartNewConversation: () => void;
   isCollapsed: boolean;
-  onToggleCollapse: () => void;
 }
 
 export const PromptSidebar: React.FC<PromptSidebarProps> = ({
@@ -37,7 +35,6 @@ export const PromptSidebar: React.FC<PromptSidebarProps> = ({
   onImportPrompts,
   onStartNewConversation,
   isCollapsed,
-  onToggleCollapse,
 }) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<{
@@ -45,7 +42,6 @@ export const PromptSidebar: React.FC<PromptSidebarProps> = ({
     name: string;
     content: string;
   } | null>(null);
-  const [importStatus, setImportStatus] = useState<string | null>(null);
 
   const handleCreatePrompt = (name: string, content: string) => {
     onCreatePrompt(name, content);
@@ -76,37 +72,19 @@ export const PromptSidebar: React.FC<PromptSidebarProps> = ({
 
   const handleImport = async () => {
     try {
-      setImportStatus(null);
       const importedCount = await onImportPrompts();
-      setImportStatus(`Successfully imported ${importedCount} prompts`);
-      setTimeout(() => setImportStatus(null), 3000);
+      toast.success(`Successfully imported ${importedCount} prompts`);
     } catch (error) {
-      setImportStatus(
+      toast.error(
         `Import failed: ${
           error instanceof Error ? error.message : "Unknown error"
         }`
       );
-      setTimeout(() => setImportStatus(null), 5000);
     }
   };
 
   return (
-    <div
-      className={`bg-gray-50 border-r border-gray-200 flex flex-col h-full transition-all duration-200 ${
-        isCollapsed ? "w-12" : "w-80"
-      }`}
-    >
-      {/* Toggle button */}
-      <div className="absolute top-4 -right-3 z-10">
-        <button
-          onClick={onToggleCollapse}
-          className="p-1.5 bg-white border border-gray-200 rounded-full shadow-sm hover:bg-gray-50 transition-colors"
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
-      </div>
-
+    <div className="flex flex-col h-full w-full overflow-hidden">
       {!isCollapsed ? (
         <>
           <div className="p-4 border-b border-gray-200">
@@ -158,20 +136,6 @@ export const PromptSidebar: React.FC<PromptSidebarProps> = ({
                 Export
               </button>
             </div>
-
-            {/* Status message */}
-            {importStatus && (
-              <div
-                className={`mt-2 p-2 rounded text-xs ${
-                  importStatus.includes("failed") ||
-                  importStatus.includes("Import failed")
-                    ? "bg-red-50 text-red-800 border border-red-200"
-                    : "bg-green-50 text-green-800 border border-green-200"
-                }`}
-              >
-                {importStatus}
-              </div>
-            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-2">

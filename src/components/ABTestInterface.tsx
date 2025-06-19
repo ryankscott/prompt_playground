@@ -164,7 +164,12 @@ export const ABTestInterface: React.FC<ABTestInterfaceProps> = ({
           }));
         };
 
-        const result = await createApiCall(messagesToSend, leftConfig, onChunk);
+        const result = await createApiCall(
+          messagesToSend,
+          leftConfig,
+          [],
+          onChunk
+        );
 
         setLeftResult((prev) => ({
           ...prev,
@@ -201,6 +206,7 @@ export const ABTestInterface: React.FC<ABTestInterfaceProps> = ({
         const result = await createApiCall(
           messagesToSend,
           rightConfig,
+          [],
           onChunk
         );
 

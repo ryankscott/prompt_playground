@@ -10,12 +10,25 @@ import {
   DollarSign,
   RotateCcw,
   MessageSquarePlus,
+  Wrench,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { Message, LLMConfig, Prompt, MessageMetadata } from "../types";
+import hljs from "highlight.js/lib/core";
+import json from "highlight.js/lib/languages/json";
+import "highlight.js/styles/github.css";
+import type {
+  Message,
+  LLMConfig,
+  Prompt,
+  MessageMetadata,
+  Tool,
+} from "../types";
 import { MODELS } from "../types";
 import { Button } from "./ui/button";
+
+// Register JSON language for highlight.js
+hljs.registerLanguage("json", json);
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -24,6 +37,7 @@ interface ChatInterfaceProps {
   error?: string;
   config: LLMConfig;
   selectedPrompt?: Prompt | null;
+  selectedTools?: Tool[];
   onOpenSettings: () => void;
   onClearConversation?: () => void;
   onStartNewConversation?: () => void;
@@ -38,6 +52,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   error,
   config,
   selectedPrompt,
+  selectedTools,
   onOpenSettings,
   onClearConversation,
   onStartNewConversation,
@@ -74,6 +89,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         textareaRef.current.scrollHeight,
         120
       )}px`;
+    }
+  };
+
+  const highlightJson = (jsonString: string) => {
+    try {
+      const highlighted = hljs.highlight(jsonString, { language: "json" });
+      return highlighted.value;
+    } catch {
+      return jsonString; // Fallback to plain text if highlighting fails
     }
   };
 
@@ -117,23 +141,38 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const renderMessage = (message: Message) => {
     const isUser = message.role === "user";
     const isSystem = message.role === "system";
+    const isTool = message.role === "tool";
 
     return (
       <div
         key={message.id}
         className={`flex gap-3 p-4 ${
-          isUser ? "bg-blue-50" : isSystem ? "bg-yellow-50" : "bg-white"
+          isUser
+            ? "bg-blue-50"
+            : isSystem
+            ? "bg-yellow-50"
+            : isTool
+            ? "bg-purple-50 border-l-4 border-purple-300"
+            : "bg-white"
         } border-b border-gray-100`}
       >
         <div
           className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-            isUser ? "bg-blue-600" : isSystem ? "bg-yellow-600" : "bg-gray-600"
+            isUser
+              ? "bg-blue-600"
+              : isSystem
+              ? "bg-yellow-600"
+              : isTool
+              ? "bg-purple-600"
+              : "bg-gray-600"
           }`}
         >
           {isUser ? (
             <User size={16} className="text-white" />
           ) : isSystem ? (
             <AlertCircle size={16} className="text-white" />
+          ) : isTool ? (
+            <Wrench size={16} className="text-white" />
           ) : (
             <Bot size={16} className="text-white" />
           )}
@@ -141,92 +180,189 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-medium text-gray-900">
-              {isUser ? "You" : isSystem ? "System" : config.model}
+              {isUser
+                ? "You"
+                : isSystem
+                ? "System"
+                : isTool
+                ? "Tool Result"
+                : config.model}
             </span>
+            {/* Tool usage indicator for assistant messages */}
+            {message.role === "assistant" &&
+              message.toolCalls &&
+              message.toolCalls.length > 0 && (
+                <div className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">
+                  <Wrench size={10} />
+                  <span>
+                    Used {message.toolCalls.length} tool
+                    {message.toolCalls.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              )}
             <span className="text-xs text-gray-500">
               {new Date(message.timestamp).toLocaleTimeString()}
             </span>
           </div>
-          <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                code: (props) => {
-                  return (
-                    <code className="bg-gray-100 px-1 py-0.5 rounded text-sm">
-                      {props.children}
+
+          {/* Tool calls display */}
+          {message.toolCalls && message.toolCalls.length > 0 && (
+            <div className="mb-3 space-y-2">
+              <div className="text-xs font-medium text-purple-700 flex items-center gap-1">
+                <Wrench size={12} />
+                Tool Execution{" "}
+                {message.toolCalls.length > 1
+                  ? `(${message.toolCalls.length} tools)`
+                  : ""}
+              </div>
+              {message.toolCalls.map((toolCall) => (
+                <div
+                  key={toolCall.id}
+                  className="bg-purple-100 border border-purple-200 p-3 rounded-lg"
+                >
+                  <div className="text-sm font-medium text-purple-800 flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                    Calling:{" "}
+                    <code className="bg-purple-200 px-1 py-0.5 rounded text-xs">
+                      {toolCall.name}
                     </code>
-                  );
-                },
-                pre: (props) => (
-                  <pre className="bg-gray-100 rounded-md p-3 overflow-x-auto mb-2">
-                    {props.children}
-                  </pre>
-                ),
-                p: (props) => (
-                  <p className="mb-2 last:mb-0">{props.children}</p>
-                ),
-                h1: (props) => (
-                  <h1 className="text-xl font-bold mb-2">{props.children}</h1>
-                ),
-                h2: (props) => (
-                  <h2 className="text-lg font-bold mb-2">{props.children}</h2>
-                ),
-                h3: (props) => (
-                  <h3 className="text-base font-bold mb-1">{props.children}</h3>
-                ),
-                ul: (props) => (
-                  <ul className="list-disc pl-6 mb-2">{props.children}</ul>
-                ),
-                ol: (props) => (
-                  <ol className="list-decimal pl-6 mb-2">{props.children}</ol>
-                ),
-                li: (props) => <li className="mb-1">{props.children}</li>,
-                blockquote: (props) => (
-                  <blockquote className="border-l-4 border-gray-300 pl-4 italic mb-2">
-                    {props.children}
-                  </blockquote>
-                ),
-                strong: (props) => (
-                  <strong className="font-bold">{props.children}</strong>
-                ),
-                em: (props) => <em className="italic">{props.children}</em>,
-                a: (props) => (
-                  <a
-                    href={props.href}
-                    className="text-blue-600 hover:text-blue-800 underline"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {props.children}
-                  </a>
-                ),
-                table: (props) => (
-                  <table className="border-collapse w-full mb-2">
-                    {props.children}
-                  </table>
-                ),
-                thead: (props) => (
-                  <thead className="bg-gray-50">{props.children}</thead>
-                ),
-                tbody: (props) => <tbody>{props.children}</tbody>,
-                tr: (props) => (
-                  <tr className="border-b border-gray-200">{props.children}</tr>
-                ),
-                th: (props) => (
-                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                    {props.children}
-                  </th>
-                ),
-                td: (props) => (
-                  <td className="border border-gray-300 px-3 py-2">
-                    {props.children}
-                  </td>
-                ),
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
+                  </div>
+                  <div className="text-xs text-purple-600">
+                    <div className="text-xs font-medium text-purple-700 mb-1">
+                      Arguments:
+                    </div>
+                    <pre
+                      className="whitespace-pre-wrap bg-white p-2 rounded border border-purple-200 overflow-x-auto text-xs"
+                      dangerouslySetInnerHTML={{
+                        __html: highlightJson(
+                          JSON.stringify(toolCall.arguments, null, 2)
+                        ),
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
+            {isTool ? (
+              // Special handling for tool result content
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-purple-700 uppercase tracking-wide">
+                  Tool Response
+                </div>
+                <div className="bg-white border border-purple-200 rounded p-3">
+                  {(() => {
+                    try {
+                      // Try to parse as JSON for better formatting
+                      const parsed = JSON.parse(message.content);
+                      return (
+                        <pre
+                          className="whitespace-pre-wrap text-sm overflow-x-auto"
+                          dangerouslySetInnerHTML={{
+                            __html: highlightJson(
+                              JSON.stringify(parsed, null, 2)
+                            ),
+                          }}
+                        />
+                      );
+                    } catch {
+                      // If not JSON, display as plain text with markdown
+                      return (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {message.content}
+                        </ReactMarkdown>
+                      );
+                    }
+                  })()}
+                </div>
+              </div>
+            ) : (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  code: (props) => {
+                    return (
+                      <code className="bg-gray-100 px-1 py-0.5 rounded text-sm">
+                        {props.children}
+                      </code>
+                    );
+                  },
+                  pre: (props) => (
+                    <pre className="bg-gray-100 rounded-md p-3 overflow-x-auto mb-2">
+                      {props.children}
+                    </pre>
+                  ),
+                  p: (props) => (
+                    <p className="mb-2 last:mb-0">{props.children}</p>
+                  ),
+                  h1: (props) => (
+                    <h1 className="text-xl font-bold mb-2">{props.children}</h1>
+                  ),
+                  h2: (props) => (
+                    <h2 className="text-lg font-bold mb-2">{props.children}</h2>
+                  ),
+                  h3: (props) => (
+                    <h3 className="text-base font-bold mb-1">
+                      {props.children}
+                    </h3>
+                  ),
+                  ul: (props) => (
+                    <ul className="list-disc pl-6 mb-2">{props.children}</ul>
+                  ),
+                  ol: (props) => (
+                    <ol className="list-decimal pl-6 mb-2">{props.children}</ol>
+                  ),
+                  li: (props) => <li className="mb-1">{props.children}</li>,
+                  blockquote: (props) => (
+                    <blockquote className="border-l-4 border-gray-300 pl-4 italic mb-2">
+                      {props.children}
+                    </blockquote>
+                  ),
+                  strong: (props) => (
+                    <strong className="font-bold">{props.children}</strong>
+                  ),
+                  em: (props) => <em className="italic">{props.children}</em>,
+                  a: (props) => (
+                    <a
+                      href={props.href}
+                      className="text-blue-600 hover:text-blue-800 underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {props.children}
+                    </a>
+                  ),
+                  table: (props) => (
+                    <table className="border-collapse w-full mb-2">
+                      {props.children}
+                    </table>
+                  ),
+                  thead: (props) => (
+                    <thead className="bg-gray-50">{props.children}</thead>
+                  ),
+                  tbody: (props) => <tbody>{props.children}</tbody>,
+                  tr: (props) => (
+                    <tr className="border-b border-gray-200">
+                      {props.children}
+                    </tr>
+                  ),
+                  th: (props) => (
+                    <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                      {props.children}
+                    </th>
+                  ),
+                  td: (props) => (
+                    <td className="border border-gray-300 px-3 py-2">
+                      {props.children}
+                    </td>
+                  ),
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            )}
           </div>
           {message.role === "assistant" &&
             renderMessageMetadata(message.metadata)}
@@ -241,9 +377,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {showHeader && (
         <div className="border-b border-gray-200 p-4">
           <div className="w-full max-w-full mx-2 flex items-center justify-between">
-            <h1 className="text-xl font-semibold text-gray-900">
-              {selectedPrompt ? selectedPrompt.name : "Prompt Playground"}
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-semibold text-gray-900">
+                {selectedPrompt ? selectedPrompt.name : "Prompt Playground"}
+              </h1>
+              {selectedTools && selectedTools.length > 0 && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
+                  <Wrench size={12} />
+                  <span>
+                    {selectedTools.length} tool
+                    {selectedTools.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               {/* Model Selector */}
               <div className="flex items-center gap-2">

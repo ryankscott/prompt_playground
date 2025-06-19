@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { MessageSquare, Split } from "lucide-react";
-import type { Message, LLMConfig, Prompt } from "../types";
+import type { Message, LLMConfig, Prompt, Tool } from "../types";
 import { ChatInterface } from "./ChatInterface";
 import { ABTestInterface } from "./ABTestInterface";
 
@@ -11,6 +11,7 @@ interface TabbedChatInterfaceProps {
   error?: string;
   config: LLMConfig;
   selectedPrompt?: Prompt | null;
+  selectedTools?: Tool[];
   onOpenSettings: () => void;
   onClearConversation?: () => void;
   onStartNewConversation?: () => void;
@@ -24,6 +25,7 @@ export const TabbedChatInterface: React.FC<TabbedChatInterfaceProps> = ({
   error,
   config,
   selectedPrompt,
+  selectedTools,
   onOpenSettings,
   onClearConversation,
   onStartNewConversation,
@@ -82,6 +84,7 @@ export const TabbedChatInterface: React.FC<TabbedChatInterfaceProps> = ({
             error={error}
             config={config}
             selectedPrompt={selectedPrompt}
+            selectedTools={selectedTools}
             onOpenSettings={onOpenSettings}
             onClearConversation={onClearConversation}
             onStartNewConversation={onStartNewConversation}

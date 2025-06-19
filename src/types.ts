@@ -18,18 +18,59 @@ export interface MessageMetadata {
   cost?: number; // in USD
 }
 
+export interface ToolParameter {
+  type: "string" | "number" | "boolean" | "array" | "object";
+  description: string;
+  enum?: string[]; // For string parameters with predefined values
+}
+
+export interface ToolFunction {
+  name: string;
+  description: string;
+  parameters: {
+    type: "object";
+    properties: Record<string, ToolParameter>;
+    required: string[];
+  };
+}
+
+export interface Tool {
+  id: string;
+  type: "function";
+  function: ToolFunction;
+  code: string; // JavaScript code to execute
+  emoji?: string; // Emoji to represent the tool (defaults to 🔧 when not provided)
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface ToolResult {
+  toolCallId: string;
+  result: unknown;
+  error?: string;
+}
+
 export interface Message {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   content: string;
   timestamp: Date;
   metadata?: MessageMetadata;
+  toolCalls?: ToolCall[];
+  toolCallId?: string; // For tool result messages
 }
 
 export interface Conversation {
   id: string;
   messages: Message[];
   promptId?: string;
+  toolIds?: string[]; // Selected tools for this conversation
 }
 
 export type LLMProvider = "openai" | "anthropic" | "google" | "ollama";
@@ -140,14 +181,14 @@ export const MODELS: Record<LLMProvider, Model[]> = {
       id: "llama3.2",
       name: "Llama 3.2",
       provider: "ollama",
-      supportsTools: false,
+      supportsTools: true,
       cost: { input: 0, output: 0 },
     },
     {
       id: "gemma3",
       name: "Gemma 3",
       provider: "ollama",
-      supportsTools: true,
+      supportsTools: false,
       cost: { input: 0, output: 0 },
     },
   ],

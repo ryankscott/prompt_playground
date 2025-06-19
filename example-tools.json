@@ -1,0 +1,91 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "get_weather",
+      "description": "Get current weather information for a city",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "The city name to get weather for"
+          },
+          "format": {
+            "type": "string",
+            "description": "The format to return the weather in, e.g. 'celsius' or 'fahrenheit'",
+            "enum": ["celsius", "fahrenheit"]
+          }
+        },
+        "required": ["city", "format"]
+      }
+    },
+    "id": "weather-tool",
+    "code": "// Weather lookup tool\nasync function getWeather(args) {\n  const { city } = args;\n  \n  try {\n    // Using a free weather API (openweathermap requires API key)\n    // For demo purposes, we'll return mock data\n    const weatherData = {\n      city: city,\n      temperature: Math.floor(Math.random() * 30) + 10, // Random temp between 10-40°C\n      condition: ['sunny', 'cloudy', 'rainy', 'partly cloudy'][Math.floor(Math.random() * 4)],\n      humidity: Math.floor(Math.random() * 50) + 30, // Random humidity 30-80%\n      timestamp: new Date().toISOString()\n    };\n    \n    return `Weather in ${weatherData.city}:\n- Temperature: ${weatherData.temperature}°C\n- Condition: ${weatherData.condition}\n- Humidity: ${weatherData.humidity}%\n- Last updated: ${new Date(weatherData.timestamp).toLocaleString()}`;\n  } catch (error) {\n    return `Error getting weather for ${city}: ${error.message}`;\n  }\n}\n\nreturn await getWeather(args);",
+    "createdAt": "2025-06-18T10:00:00.000Z",
+    "updatedAt": "2025-06-18T10:00:00.000Z"
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "calculate",
+      "description": "Perform basic mathematical calculations",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "description": "Mathematical expression to evaluate (e.g., '2 + 3 * 4')"
+          }
+        },
+        "required": ["expression"]
+      }
+    },
+    "id": "calculator-tool",
+    "code": "// Simple calculator tool\nfunction calculate(args) {\n  const { expression } = args;\n  \n  try {\n    // Simple safety check - only allow basic math operations\n    const safeExpression = expression.replace(/[^0-9+\\-*/().\\s]/g, '');\n    \n    if (safeExpression !== expression) {\n      return 'Error: Invalid characters in expression. Only numbers and basic operators (+, -, *, /, parentheses) are allowed.';\n    }\n    \n    // Evaluate the expression\n    const result = Function('return ' + safeExpression)();\n    \n    if (typeof result !== 'number' || !isFinite(result)) {\n      return 'Error: Invalid mathematical expression or result.';\n    }\n    \n    return `${expression} = ${result}`;\n  } catch (error) {\n    return `Error calculating \"${expression}\": ${error.message}`;\n  }\n}\n\nreturn calculate(args);",
+    "createdAt": "2025-06-18T10:00:00.000Z",
+    "updatedAt": "2025-06-18T10:00:00.000Z"
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "generate_uuid",
+      "description": "Generate a random UUID",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Number of UUIDs to generate (default: 1)"
+          }
+        },
+        "required": []
+      }
+    },
+    "id": "uuid-generator",
+    "code": "// UUID Generator tool\nfunction generateUUID() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\n    const r = Math.random() * 16 | 0;\n    const v = c === 'x' ? r : (r & 0x3 | 0x8);\n    return v.toString(16);\n  });\n}\n\nfunction generateUUIDs(args) {\n  const count = args.count || 1;\n  \n  if (count < 1 || count > 10) {\n    return 'Error: Count must be between 1 and 10';\n  }\n  \n  const uuids = [];\n  for (let i = 0; i < count; i++) {\n    uuids.push(generateUUID());\n  }\n  \n  return count === 1 \n    ? `Generated UUID: ${uuids[0]}`\n    : `Generated ${count} UUIDs:\\n${uuids.map((uuid, i) => `${i + 1}. ${uuid}`).join('\\n')}`;\n}\n\nreturn generateUUIDs(args);",
+    "createdAt": "2025-06-18T10:00:00.000Z",
+    "updatedAt": "2025-06-18T10:00:00.000Z"
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "analyze_text",
+      "description": "Analyze text and provide statistics",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The text to analyze"
+          }
+        },
+        "required": ["text"]
+      }
+    },
+    "id": "text-analyzer",
+    "code": "// Text analyzer tool\nfunction analyzeText(args) {\n  const { text } = args;\n  \n  if (!text || typeof text !== 'string') {\n    return 'Error: Please provide text to analyze';\n  }\n  \n  const characters = text.length;\n  const charactersNoSpaces = text.replace(/\\s/g, '').length;\n  const words = text.trim() ? text.trim().split(/\\s+/).length : 0;\n  const sentences = text.trim() ? text.split(/[.!?]+/).filter(s => s.trim().length > 0).length : 0;\n  const paragraphs = text.trim() ? text.split(/\\n\\s*\\n/).filter(p => p.trim().length > 0).length : 0;\n  \n  const avgWordsPerSentence = sentences > 0 ? (words / sentences).toFixed(1) : 0;\n  const avgCharsPerWord = words > 0 ? (charactersNoSpaces / words).toFixed(1) : 0;\n  \n  return `Text Analysis Results:\n• Characters: ${characters} (${charactersNoSpaces} without spaces)\n• Words: ${words}\n• Sentences: ${sentences}\n• Paragraphs: ${paragraphs}\n• Average words per sentence: ${avgWordsPerSentence}\n• Average characters per word: ${avgCharsPerWord}`;\n}\n\nreturn analyzeText(args);",
+    "createdAt": "2025-06-18T10:00:00.000Z",
+    "updatedAt": "2025-06-18T10:00:00.000Z"
+  }
+]
