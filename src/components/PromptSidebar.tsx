@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import type { Prompt } from "../types";
 import { CreatePromptDialog } from "./CreatePromptDialog";
+import { Button } from "./ui/button";
 
 interface PromptSidebarProps {
   prompts: Prompt[];
@@ -94,47 +95,53 @@ export const PromptSidebar: React.FC<PromptSidebarProps> = ({
 
             {/* Start New Conversation button */}
             <div className="mb-3">
-              <button
+              <Button
                 onClick={onStartNewConversation}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 hover:border-blue-300"
+                variant="outline"
+                className="w-full text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-800"
                 title="Start a new conversation without a prompt"
               >
                 <MessageSquarePlus size={16} />
                 New Conversation
-              </button>
+              </Button>
             </div>
 
             {/* Create new prompt button */}
             <div className="mb-3">
-              <button
+              <Button
                 onClick={() => setIsCreateDialogOpen(true)}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 hover:border-blue-300"
+                variant="outline"
+                className="w-full text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-800"
                 title="Create new prompt"
               >
                 <Plus size={16} />
                 New Prompt
-              </button>
+              </Button>
             </div>
 
             {/* Import/Export buttons */}
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={handleImport}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                variant="outline"
+                size="sm"
+                className="flex-1 text-gray-600 hover:text-gray-900"
                 title="Import prompts from file"
               >
                 <Upload size={16} />
                 Import
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleExport}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                variant="outline"
+                size="sm"
+                className="flex-1 text-gray-600 hover:text-gray-900"
                 title="Export prompts to file"
                 disabled={prompts.length === 0}
               >
                 <Download size={16} />
                 Export
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -154,24 +161,28 @@ export const PromptSidebar: React.FC<PromptSidebarProps> = ({
                     {prompt.name}
                   </h3>
                   <div className="flex gap-1">
-                    <button
+                    <Button
                       onClick={(e) => {
                         e.stopPropagation();
                         startEditing(prompt);
                       }}
+                      variant="ghost"
+                      size="icon"
                       className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                     >
                       <Edit2 size={14} />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={(e) => {
                         e.stopPropagation();
                         onDeletePrompt(prompt.id);
                       }}
+                      variant="ghost"
+                      size="icon"
                       className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 <p className="text-xs text-gray-600 line-clamp-2">
@@ -187,20 +198,24 @@ export const PromptSidebar: React.FC<PromptSidebarProps> = ({
       ) : (
         // Collapsed state - show only essential items
         <div className="p-2 flex flex-col items-center space-y-3 mt-12">
-          <button
+          <Button
             onClick={() => setIsCreateDialogOpen(true)}
+            variant="ghost"
+            size="icon"
             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
             title="Create new prompt"
           >
             <Plus size={20} />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onStartNewConversation}
+            variant="ghost"
+            size="icon"
             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
             title="Start a new conversation without a prompt"
           >
             <MessageSquarePlus size={20} />
-          </button>
+          </Button>
           {prompts.length > 0 && (
             <div className="text-xs text-gray-500 text-center">
               {prompts.length}

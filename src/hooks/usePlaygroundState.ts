@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
+import { useChat } from "@ai-sdk/react";
 import {
   Prompt,
   Message,
@@ -7,44 +8,104 @@ import {
   LLMConfig,
   Tool,
   ToolParameter,
-  ToolCall,
+  ParameterFormData,
   getProviderForModel,
+  getModelInfo,
+  MessageMetadata,
 } from "../types";
-import { storage, createApiCall } from "../utils";
-
-// Helper interface for form state
-interface ParameterFormData {
-  name: string;
-  type: "string" | "number" | "boolean" | "array" | "object";
-  description: string;
-  required: boolean;
-  enum?: string[];
-}
+import { storage } from "../utils";
 
 // usePlaygroundState.ts - Custom hook for managing prompt playground state
 //
-// Recent fix: Tools are now properly passed to API calls
+// This hook manages all LLM interactions through the Vercel AI SDK:
 // - selectedTools are filtered from the tools array based on selectedToolIds
-// - Tools are passed to createApiCall which forwards them to the appropriate provider
-// - Only OpenAI provider currently implements tool support
-// - Other providers accept tools parameter but don't use them yet
+// - All model calls go through the AI SDK's useChat hook and /api/chat endpoint
+// - Tool calls are handled via the AI SDK's onToolCall callback
+// - Messages are synchronized between AI SDK state and application state
 
 export const usePlaygroundState = () => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
+  const [conversationId, setConversationId] = useState<string>(uuidv4());
   const [conversation, setConversation] = useState<Conversation>({
-    id: uuidv4(),
+    id: conversationId,
     messages: [],
   });
   const [config, setConfig] = useState<LLMConfig>({
-    model: "gemma3",
+    model: "llama:3.2",
     temperature: 0.2,
     maxTokens: 5000,
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | undefined>();
   const [tools, setTools] = useState<Tool[]>([]);
   const [selectedToolIds, setSelectedToolIds] = useState<string[]>([]);
+
+  // Track message metadata to transfer from AI SDK to app messages
+  const messageMetadataRef = useRef<Map<string, MessageMetadata>>(new Map());
+  const requestStartTimeRef = useRef<number>(Date.now());
+
+  // Get selected tools
+  const selectedTools = tools.filter((tool) =>
+    selectedToolIds.includes(tool.id)
+  );
+
+  // AI SDK chat hook for managing message state and API interactions
+  const {
+    messages: aiMessages,
+    append,
+    error,
+    status,
+    setMessages: setAiMessages,
+    reload,
+    stop,
+    input,
+    handleInputChange,
+    handleSubmit,
+  } = useChat({
+    api: "/api/chat",
+    id: conversationId,
+    body: {
+      model: config.model,
+      temperature: config.temperature,
+      maxTokens: config.maxTokens,
+      tools: selectedTools,
+    },
+
+    onError: (chatError) => {
+      console.error("Chat error:", chatError.message);
+    },
+
+    onResponse: (response) => {
+      if (!response.ok) {
+        console.error(`API Error: ${response.statusText}`);
+      }
+    },
+
+    onFinish: (message, options) => {
+      // Store metadata to be used in message synchronization
+      if (options?.usage) {
+        const usage = options.usage;
+        const modelInfo = getModelInfo(config.model);
+
+        const messageMetadata: MessageMetadata = {
+          tokenUsage: {
+            inputTokens: usage.promptTokens || 0,
+            outputTokens: usage.completionTokens || 0,
+            totalTokens: usage.totalTokens || 0,
+          },
+          // Calculate cost if we have pricing info
+          cost: modelInfo?.cost
+            ? ((usage.promptTokens || 0) * modelInfo.cost.input) / 1000000 +
+              ((usage.completionTokens || 0) * modelInfo.cost.output) / 1000000
+            : undefined,
+          // Calculate timing from request start to completion
+          timeTaken: Date.now() - requestStartTimeRef.current,
+        };
+
+        // Store metadata for this message ID to be used in synchronization
+        messageMetadataRef.current.set(message.id, messageMetadata);
+      }
+    },
+  });
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -253,200 +314,187 @@ export const usePlaygroundState = () => {
     return importedTools.length;
   }, []);
 
-  const selectPrompt = useCallback((prompt: Prompt) => {
-    setSelectedPrompt(prompt);
-    // Add system message if prompt is selected
-    const systemMessage: Message = {
-      id: uuidv4(),
-      role: "system",
-      content: prompt.content,
-      timestamp: new Date(),
-    };
-    setConversation({
-      id: uuidv4(),
-      messages: [systemMessage],
-      promptId: prompt.id,
-    });
-    setError(undefined);
-  }, []);
+  const selectPrompt = useCallback(
+    (prompt: Prompt) => {
+      // Set selected prompt
+      setSelectedPrompt(prompt);
 
-  const sendMessage = useCallback(
-    async (content: string) => {
-      if (isLoading) return;
+      // Generate new conversation ID
+      const newId = uuidv4();
+      setConversationId(newId);
 
-      const userMessage: Message = {
+      // Create system message
+      const systemMessage: Message = {
         id: uuidv4(),
+        role: "system",
+        content: prompt.content,
+        timestamp: new Date(),
+      };
+
+      // Set conversation with system message
+      setConversation({
+        id: newId,
+        messages: [systemMessage],
+        promptId: prompt.id,
+      });
+
+      // Reset AI SDK messages and add system message
+      setAiMessages([
+        {
+          id: systemMessage.id,
+          role: "system",
+          content: prompt.content,
+        },
+      ]);
+    },
+    [setAiMessages]
+  );
+
+  // Custom message handling - synchronizes AI SDK messages with our app's format
+  useEffect(() => {
+    if (aiMessages.length > 0) {
+      // Convert AI SDK messages to our app's format
+      const appMessages: Message[] = aiMessages.map((aiMsg) => {
+        // Basic message properties
+        const message: Message = {
+          id: aiMsg.id,
+          role: aiMsg.role as "user" | "assistant" | "system" | "tool",
+          content: aiMsg.content,
+          timestamp: new Date(),
+        };
+
+        // Add metadata if available for this message
+        const storedMetadata = messageMetadataRef.current.get(aiMsg.id);
+        if (storedMetadata) {
+          message.metadata = storedMetadata;
+        }
+
+        // Process tool calls if they exist
+        if (aiMsg.role === "assistant" && aiMsg.parts) {
+          const toolCallParts = aiMsg.parts
+            .filter((part) => part.type === "tool-invocation")
+            .map((part) => {
+              if (part.type === "tool-invocation") {
+                return {
+                  id: part.toolInvocation.toolCallId,
+                  name: part.toolInvocation.toolName,
+                  arguments: part.toolInvocation.args,
+                };
+              }
+              return null;
+            })
+            .filter((part): part is NonNullable<typeof part> => part !== null);
+
+          if (toolCallParts.length > 0) {
+            message.toolCalls = toolCallParts;
+          }
+        }
+
+        return message;
+      });
+
+      // Update our application's conversation state
+      setConversation((prev) => ({
+        ...prev,
+        messages: appMessages,
+      }));
+    }
+  }, [aiMessages]);
+
+  // Send message using Vercel AI SDK
+  const sendMessage = async (content: string) => {
+    try {
+      // Set request start time right before making the API call
+      requestStartTimeRef.current = Date.now();
+
+      // Use the AI SDK append function to send the message
+      await append({
         role: "user",
         content,
-        timestamp: new Date(),
-      };
+      });
+    } catch (err) {
+      console.error(
+        "Send message error:",
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+  };
 
-      setConversation((prev) => ({
-        ...prev,
-        messages: [...prev.messages, userMessage],
-      }));
+  // Wrapper for handleSubmit to ensure proper timing
+  const wrappedHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    // Set request start time right before the form submission
+    requestStartTimeRef.current = Date.now();
 
-      setIsLoading(true);
-      setError(undefined);
-
-      // Create placeholder assistant message for streaming
-      const assistantMessageId = uuidv4();
-      const assistantMessage: Message = {
-        id: assistantMessageId,
-        role: "assistant",
-        content: "",
-        timestamp: new Date(),
-      };
-
-      setConversation((prev) => ({
-        ...prev,
-        messages: [...prev.messages, assistantMessage],
-      }));
-
-      try {
-        const messages = [...conversation.messages, userMessage];
-
-        // Stream callback to update the assistant message content
-        const onChunk = (chunk: string) => {
-          setConversation((prev) => ({
-            ...prev,
-            messages: prev.messages.map((msg) =>
-              msg.id === assistantMessageId
-                ? { ...msg, content: msg.content + chunk }
-                : msg
-            ),
-          }));
-        };
-
-        // Get selected tools for the API call
-        const selectedTools = tools.filter((tool) =>
-          selectedToolIds.includes(tool.id)
-        );
-
-        console.log(
-          `🔧 Selected ${selectedTools.length} tools for API call:`,
-          selectedTools.map((t) => t.function.name)
-        );
-
-        // Tool call callback to update the assistant message with tool calls
-        const onToolCall = (toolCall: ToolCall) => {
-          setConversation((prev) => ({
-            ...prev,
-            messages: prev.messages.map((msg) =>
-              msg.id === assistantMessageId
-                ? {
-                    ...msg,
-                    toolCalls: [...(msg.toolCalls || []), toolCall],
-                  }
-                : msg
-            ),
-          }));
-        };
-
-        // Tool result callback to add tool result messages
-        const onToolResult = (
-          toolCallId: string,
-          result: unknown,
-          error?: string
-        ) => {
-          const toolResultMessage: Message = {
-            id: uuidv4(),
-            role: "tool",
-            content: error ? `Error: ${error}` : JSON.stringify(result),
-            timestamp: new Date(),
-            toolCallId,
-          };
-
-          setConversation((prev) => ({
-            ...prev,
-            messages: [...prev.messages, toolResultMessage],
-          }));
-        };
-
-        const apiResult = await createApiCall(
-          messages,
-          config,
-          selectedTools,
-          onChunk,
-          onToolCall,
-          onToolResult
-        );
-
-        // Final update to ensure we have the complete response with metadata and tool calls
-        setConversation((prev) => ({
-          ...prev,
-          messages: prev.messages.map((msg) =>
-            msg.id === assistantMessageId
-              ? {
-                  ...msg,
-                  content: apiResult.content,
-                  metadata: apiResult.metadata,
-                  toolCalls: apiResult.toolCalls || msg.toolCalls,
-                }
-              : msg
-          ),
-        }));
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "An unknown error occurred";
-        setError(errorMessage);
-
-        // Remove the placeholder assistant message on error
-        setConversation((prev) => ({
-          ...prev,
-          messages: prev.messages.filter(
-            (msg) => msg.id !== assistantMessageId
-          ),
-        }));
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [conversation.messages, config, isLoading, tools, selectedToolIds]
-  );
+    // Call the original handleSubmit from AI SDK
+    handleSubmit(e);
+  };
 
   const updateConfig = useCallback((newConfig: Partial<LLMConfig>) => {
     setConfig((prev) => ({ ...prev, ...newConfig }));
-    setError(undefined);
   }, []);
 
   const updateModel = useCallback((model: string) => {
     const provider = getProviderForModel(model);
     if (!provider) {
-      setError(`Unknown model: ${model}`);
+      console.error(`Unknown model: ${model}`);
       return;
     }
-
     setConfig((prev) => ({ ...prev, model }));
-    setError(undefined);
   }, []);
 
   const clearConversation = useCallback(() => {
+    // Generate new conversation ID
+    const newId = uuidv4();
+    setConversationId(newId);
+
+    // Reset conversation with system message if prompt is selected
+    const systemMessage = selectedPrompt
+      ? {
+          id: uuidv4(),
+          role: "system" as const,
+          content: selectedPrompt.content,
+          timestamp: new Date(),
+        }
+      : null;
+
     setConversation({
-      id: uuidv4(),
-      messages: selectedPrompt
-        ? [
-            {
-              id: uuidv4(),
-              role: "system",
-              content: selectedPrompt.content,
-              timestamp: new Date(),
-            },
-          ]
-        : [],
+      id: newId,
+      messages: systemMessage ? [systemMessage] : [],
       promptId: selectedPrompt?.id,
     });
-    setError(undefined);
-  }, [selectedPrompt]);
+
+    // Reset AI SDK messages with system message if present
+    const aiSystemMessage = systemMessage
+      ? {
+          id: systemMessage.id,
+          role: "system" as const,
+          content: systemMessage.content,
+        }
+      : null;
+
+    setAiMessages(aiSystemMessage ? [aiSystemMessage] : []);
+  }, [selectedPrompt, setAiMessages]);
 
   const startNewConversation = useCallback(() => {
+    // Deselect prompt
     setSelectedPrompt(null);
+
+    // Generate new conversation ID
+    const newId = uuidv4();
+    setConversationId(newId);
+
+    // Reset conversation
     setConversation({
-      id: uuidv4(),
+      id: newId,
       messages: [],
     });
-    setError(undefined);
-  }, []);
+
+    // Reset AI SDK messages
+    setAiMessages([]);
+  }, [setAiMessages]);
+
+  // Get current model info
+  const currentModel = getModelInfo(config.model);
 
   return {
     // State
@@ -454,10 +502,20 @@ export const usePlaygroundState = () => {
     selectedPrompt,
     conversation,
     config,
-    isLoading,
+    currentModel,
     error,
     tools,
     selectedToolIds,
+
+    // AI SDK direct access - expose these for components that need them
+    aiMessages,
+    input,
+    status,
+    aiStatus: status, // Alias for clarity
+    handleInputChange,
+    handleSubmit: wrappedHandleSubmit, // Use our wrapped version for proper timing
+    reload,
+    stop,
 
     // Actions
     createPrompt,

@@ -1,31 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SidebarWrapper } from "./components/SidebarWrapper";
 import { SidebarContent } from "./components/SidebarContent";
-import { TabbedChatInterface } from "./components/TabbedChatInterface";
+import { MultiPanelPlayground } from "./components/MultiPanelPlayground";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { usePlaygroundState } from "./hooks/usePlaygroundState";
 import { Toaster } from "./components/ui/sonner";
+import type { Message } from "./types";
 
 function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentView, setCurrentView] = useState<"prompts" | "tools">(
     "prompts"
   );
+  const [messageStartTimes, setMessageStartTimes] = useState<
+    Record<string, number>
+  >({});
 
   const {
     prompts,
     selectedPrompt,
-    conversation,
     config,
-    isLoading,
-    error,
     tools,
     selectedToolIds,
+    // AI SDK direct access
+    aiMessages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    aiStatus,
+    reload,
+    stop,
+    // Actions
     createPrompt,
     updatePrompt,
     deletePrompt,
     selectPrompt,
-    sendMessage,
     updateConfig,
     updateModel,
     clearConversation,
@@ -39,6 +48,73 @@ function App() {
     exportTools,
     importTools,
   } = usePlaygroundState();
+
+  // Track when messages start streaming to calculate timing
+  useEffect(() => {
+    if (aiStatus === "streaming") {
+      const lastMessage = aiMessages[aiMessages.length - 1];
+
+      if (
+        lastMessage &&
+        lastMessage.role === "assistant" &&
+        !messageStartTimes[lastMessage.id]
+      ) {
+        setMessageStartTimes((prev) => ({
+          ...prev,
+          [lastMessage.id]: Date.now(),
+        }));
+      }
+    }
+  }, [aiStatus, aiMessages, messageStartTimes]);
+
+  // Track when AI messages change for debugging
+  useEffect(() => {
+    console.log("🔍 AI messages changed:", aiMessages.length, "messages");
+    console.log("🔍 AI status:", aiStatus);
+    if (aiMessages.length > 0) {
+      const lastMessage = aiMessages[aiMessages.length - 1];
+      console.log("🔍 Last message:", lastMessage);
+    }
+  }, [aiMessages, aiStatus]);
+
+  // Convert AI SDK messages to our Message format
+  const convertAiMessages = (aiMsgs: typeof aiMessages): Message[] => {
+    return aiMsgs.map((aiMsg) => {
+      // Basic message properties
+      const message: Message = {
+        id: aiMsg.id,
+        role: aiMsg.role as "user" | "assistant" | "system" | "tool",
+        content: aiMsg.content,
+        timestamp: new Date(),
+      };
+
+      // Add timing to metadata if available
+      if (
+        aiMsg.role === "assistant" &&
+        messageStartTimes[aiMsg.id] &&
+        aiStatus !== "streaming"
+      ) {
+        const timeTaken = Date.now() - messageStartTimes[aiMsg.id];
+        message.metadata = {
+          ...message.metadata,
+          timeTaken,
+        };
+      }
+
+      // Extract tool invocations from AI SDK message
+      // The AI SDK stores tool invocations in different properties depending on the version
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msgWithToolInvocations = aiMsg as any;
+
+      // Check for toolInvocations (newer AI SDK versions)
+      if (msgWithToolInvocations?.toolInvocations?.length > 0) {
+        message.role = "tool";
+        message.content = msgWithToolInvocations?.toolInvocations?.[0].result;
+      }
+
+      return message;
+    });
+  };
 
   return (
     <div className="h-screen flex bg-gray-100">
@@ -67,12 +143,7 @@ function App() {
       </SidebarWrapper>
 
       <div className="flex-1 flex flex-col">
-        <TabbedChatInterface
-          messages={conversation.messages}
-          onSendMessage={sendMessage}
-          isLoading={isLoading}
-          error={error}
-          config={config}
+        <MultiPanelPlayground
           selectedPrompt={selectedPrompt}
           selectedTools={tools.filter((tool) =>
             selectedToolIds.includes(tool.id)
@@ -81,12 +152,23 @@ function App() {
           onClearConversation={clearConversation}
           onStartNewConversation={startNewConversation}
           onModelChange={updateModel}
+          onConfigChange={updateConfig}
+          config={config}
+          // Pass AI SDK props
+          input={input}
+          handleInputChange={handleInputChange}
+          handleSubmit={handleSubmit}
+          status={aiStatus}
+          reload={async () => {
+            await reload();
+          }}
+          stop={stop}
+          aiMessages={convertAiMessages(aiMessages)}
         />
       </div>
 
       <SettingsPanel
         config={config}
-        onConfigChange={updateConfig}
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />

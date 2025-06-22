@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Smile } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import EmojiPicker, { Theme, EmojiStyle } from "emoji-picker-react";
 import {
   Dialog,
@@ -9,17 +9,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import type { Tool } from "../types";
+import type { Tool, ParameterFormData } from "../types";
 import { Textarea } from "./ui/textarea";
-
-// Helper interface for form state
-interface ParameterFormData {
-  name: string;
-  type: "string" | "number" | "boolean" | "array" | "object";
-  description: string;
-  required: boolean;
-  enum?: string[];
-}
+import { Button } from "./ui/button";
 
 interface CreateToolDialogProps {
   isOpen: boolean;
@@ -58,7 +50,7 @@ export const CreateToolDialog: React.FC<CreateToolDialogProps> = ({
 
   const isEditing = !!editingTool;
 
-  const onEmojiClick = (emojiObject: any) => {
+  const onEmojiClick = (emojiObject: { emoji: string }) => {
     setEmoji(emojiObject.emoji);
     setIsEmojiPickerVisible(false);
   };
@@ -90,7 +82,7 @@ export const CreateToolDialog: React.FC<CreateToolDialogProps> = ({
 
 async function execute(args) {
   // Your tool logic here
-  return "Hello from tool!";
+  return 'Hello from tool!';
 }
 
 return await execute(args);`);
@@ -162,60 +154,38 @@ return await execute(args);`);
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Tool name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Emoji</label>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-2xl border border-gray-200">
+            <div className=" ">
+              <label className="text-sm font-medium">Name</label>
+              <div
+                onClick={() => setIsEmojiPickerVisible(!isEmojiPickerVisible)}
+                className="
+                  cursor-pointer
+                  flex gap-2 w-full"
+              >
+                <div className="position-relative bg-gray-100 hover:bg-gray-200 rounded-md p-1 flex items-center justify-center min-h-12 min-w-12">
                   {emoji || "🔧"}
                 </div>
-                <div className="flex-1 relative">
-                  <div className="flex">
-                    <input
-                      type="text"
-                      value={emoji}
-                      onChange={(e) => setEmoji(e.target.value)}
-                      placeholder="Type or select an emoji..."
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      maxLength={2}
+                {isEmojiPickerVisible && (
+                  <div className="absolute z-10 mt-1 left-4 top-40">
+                    <EmojiPicker
+                      onEmojiClick={onEmojiClick}
+                      skinTonesDisabled={true}
+                      theme={Theme.LIGHT}
+                      emojiStyle={EmojiStyle.NATIVE}
+                      searchPlaceHolder="Search emoji..."
+                      width={320}
+                      height={400}
                     />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setIsEmojiPickerVisible(!isEmojiPickerVisible)
-                      }
-                      className="px-3 py-2 bg-gray-100 border border-gray-300 border-l-0 rounded-r-md hover:bg-gray-200 transition-colors"
-                    >
-                      <Smile size={20} />
-                    </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    This emoji will identify your tool in the sidebar
-                  </p>
-                  {isEmojiPickerVisible && (
-                    <div className="absolute z-10 mt-1 right-0">
-                      <EmojiPicker
-                        onEmojiClick={onEmojiClick}
-                        theme={Theme.LIGHT}
-                        emojiStyle={EmojiStyle.NATIVE}
-                        searchPlaceHolder="Search emoji..."
-                        width={320}
-                        height={400}
-                      />
-                    </div>
-                  )}
-                </div>
+                )}
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Tool name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
               </div>
             </div>
           </div>
@@ -235,14 +205,15 @@ return await execute(args);`);
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Parameters</label>
-              <button
+              <Button
                 type="button"
+                variant="link"
                 onClick={addParameter}
                 className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
               >
                 <Plus size={16} />
                 Add Parameter
-              </button>
+              </Button>
             </div>
 
             <div className="space-y-3">
@@ -265,13 +236,15 @@ return await execute(args);`);
                         Parameter {index + 1}
                       </span>
                     </div>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => removeParameter(index)}
                       className="text-red-500 hover:text-red-700"
                     >
                       <Trash2 size={16} />
-                    </button>
+                    </Button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -403,19 +376,12 @@ return await execute(args);`);
           </div>
 
           <DialogFooter>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-            >
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
-            >
+            </Button>
+            <Button type="submit">
               {isEditing ? "Save Changes" : "Create Tool"}
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

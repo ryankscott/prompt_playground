@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import { Button } from "./ui/button";
 
 interface CreatePromptDialogProps {
   isOpen: boolean;
@@ -108,19 +109,12 @@ export const CreatePromptDialog: React.FC<CreatePromptDialogProps> = ({
             />
           </div>
           <DialogFooter>
-            <button
-              type="button"
-              onClick={handleClose}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
-            >
+            <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2"
-            >
+            </Button>
+            <Button type="submit">
               {isEditing ? "Update Prompt" : "Create Prompt"}
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

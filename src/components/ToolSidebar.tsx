@@ -9,18 +9,9 @@ import {
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Tool } from "../types";
+import type { Tool, ParameterFormData } from "../types";
 import { CreateToolDialog } from "./CreateToolDialog";
 import { Button } from "./ui/button";
-
-// Helper interface for form state
-interface ParameterFormData {
-  name: string;
-  type: "string" | "number" | "boolean" | "array" | "object";
-  description: string;
-  required: boolean;
-  enum?: string[];
-}
 
 interface ToolSidebarProps {
   tools: Tool[];
@@ -256,9 +247,13 @@ export const ToolSidebar: React.FC<ToolSidebarProps> = ({
           {/* Show tool emojis in collapsed view */}
           <div className="flex flex-col items-center space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto px-2 py-2">
             {tools.map((tool) => (
-              <button
+              <Button
                 key={tool.id}
                 onClick={() => onToggleTool(tool.id)}
+                variant={
+                  selectedToolIds.includes(tool.id) ? "secondary" : "ghost"
+                }
+                size="icon"
                 className={`p-2 rounded-lg transition-colors relative ${
                   selectedToolIds.includes(tool.id)
                     ? "bg-green-100 text-green-700"
@@ -274,7 +269,7 @@ export const ToolSidebar: React.FC<ToolSidebarProps> = ({
                     <Check size={8} className="text-white" />
                   </div>
                 )}
-              </button>
+              </Button>
             ))}
           </div>
         </div>

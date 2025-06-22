@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import type { LLMProvider, LLMConfig, ProviderConfig } from "../types";
-import { MODELS, getProviderForModel } from "../types";
+import type { LLMConfig } from "../types";
+import { MODELS, getProviderIdForModel } from "../models";
 import { storage } from "../utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import {
@@ -10,34 +10,30 @@ import {
   CardHeader,
   CardTitle,
 } from "./ui/card";
-import {
-  Check,
-  Key,
-  Server,
-  Zap,
-  Settings2,
-  Search,
-  Asterisk,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { Check, Key, Settings2, Eye, EyeOff } from "lucide-react";
+import { OpenAIIcon, AnthropicIcon, GoogleIcon, OllamaIcon } from "../icons";
 
 interface SettingsPanelProps {
   config: LLMConfig;
-  onConfigChange: (config: Partial<LLMConfig>) => void;
   isOpen: boolean;
   onClose: () => void;
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   config,
-  onConfigChange,
   isOpen,
   onClose,
 }) => {
+  // Define our custom provider configuration interface
+  interface LocalProviderConfig {
+    model: string;
+    apiKey?: string;
+    baseUrl?: string;
+  }
+
   // State to track API key visibility for each provider
   const [apiKeyVisibility, setApiKeyVisibility] = useState<
-    Record<LLMProvider, boolean>
+    Record<string, boolean>
   >({
     openai: false,
     anthropic: false,
@@ -47,36 +43,25 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // Provider configs stored locally in the settings panel
   const [providerConfigs, setProviderConfigs] = useState<
-    Record<LLMProvider, ProviderConfig>
+    Record<string, LocalProviderConfig>
   >(() => {
-    const currentProvider = getProviderForModel(config.model);
     const storedConfigs = storage.getProviderConfigs();
     return {
       openai: {
-        model: MODELS.openai[0]?.id || "gpt-4o-mini",
-        apiKey:
-          storedConfigs.openai?.apiKey ||
-          (currentProvider === "openai" ? config.apiKey : undefined),
+        model: MODELS.openai?.[0]?.id || "gpt-4o-mini",
+        apiKey: storedConfigs.openai?.apiKey || "",
       },
       anthropic: {
-        model: MODELS.anthropic[0]?.id || "claude-sonnet-4-20250514",
-        apiKey:
-          storedConfigs.anthropic?.apiKey ||
-          (currentProvider === "anthropic" ? config.apiKey : undefined),
+        model: MODELS.anthropic?.[0]?.id || "claude-3-opus",
+        apiKey: storedConfigs.anthropic?.apiKey || "",
       },
       google: {
-        model: MODELS.google[0]?.id || "gemini-2.0-flash",
-        apiKey:
-          storedConfigs.google?.apiKey ||
-          (currentProvider === "google" ? config.apiKey : undefined),
+        model: MODELS.google?.[0]?.id || "gemini-1.5-pro",
+        apiKey: storedConfigs.google?.apiKey || "",
       },
       ollama: {
-        model: MODELS.ollama[0]?.id || "llama3.2",
-        baseUrl:
-          storedConfigs.ollama?.baseUrl ||
-          (currentProvider === "ollama"
-            ? config.baseUrl || "http://localhost:11434"
-            : "http://localhost:11434"),
+        model: MODELS.ollama?.[0]?.id || "llama3",
+        baseUrl: storedConfigs.ollama?.baseUrl || "http://localhost:11434",
       },
     };
   });
@@ -87,8 +72,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [providerConfigs]);
 
   const updateProviderConfig = (
-    provider: LLMProvider,
-    updates: Partial<ProviderConfig>
+    provider: string,
+    updates: Partial<LocalProviderConfig>
   ) => {
     setProviderConfigs((prev) => ({
       ...prev,
@@ -99,29 +84,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }));
   };
 
-  const updateCommonSettings = (updates: {
-    temperature?: number;
-    maxTokens?: number;
-  }) => {
-    onConfigChange(updates);
-  };
-
-  const getProviderIcon = (provider: LLMProvider) => {
+  const getProviderIcon = (provider: string) => {
     switch (provider) {
       case "openai":
-        return <Zap className="w-5 h-5" />;
+        return React.createElement(OpenAIIcon, { className: "w-5 h-5" });
       case "anthropic":
-        return <Asterisk className="w-5 h-5" />;
+        return React.createElement(AnthropicIcon, { className: "w-5 h-5" });
       case "google":
-        return <Search className="w-5 h-5" />;
+        return React.createElement(GoogleIcon, { className: "w-5 h-5" });
       case "ollama":
-        return <Server className="w-5 h-5" />;
+        return React.createElement(OllamaIcon, { className: "w-5 h-5" });
       default:
-        return <Settings2 className="w-5 h-5" />;
+        return React.createElement(Settings2, { className: "w-5 h-5" });
     }
   };
 
-  const getProviderName = (provider: LLMProvider) => {
+  const getProviderName = (provider: string) => {
     switch (provider) {
       case "openai":
         return "OpenAI";
@@ -137,10 +115,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   };
 
   // Group models by provider for display
-  const modelsByProvider = Object.entries(MODELS) as [
-    LLMProvider,
-    (typeof MODELS)[LLMProvider]
-  ][];
+  const modelsByProvider = Object.entries(MODELS);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -234,7 +209,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     {provider === "ollama" && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          <Server className="w-4 h-4 inline mr-1" />
+                          {React.createElement(OllamaIcon, {
+                            className: "w-4 h-4 inline mr-1",
+                          })}
                           Base URL
                         </label>
                         <input
@@ -257,64 +234,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               );
             })}
           </div>
-
-          {/* Common Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Model Parameters</CardTitle>
-              <CardDescription>
-                These settings apply to all models
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Temperature: {config.temperature.toFixed(1)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={config.temperature}
-                  onChange={(e) =>
-                    updateCommonSettings({
-                      temperature: parseFloat(e.target.value),
-                    })
-                  }
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>Focused (0.0)</span>
-                  <span>Balanced (1.0)</span>
-                  <span>Creative (2.0)</span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Max Tokens: {config.maxTokens}
-                </label>
-                <input
-                  type="range"
-                  min="100"
-                  max="8000"
-                  step="100"
-                  value={config.maxTokens}
-                  onChange={(e) =>
-                    updateCommonSettings({
-                      maxTokens: parseInt(e.target.value, 10),
-                    })
-                  }
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         <div className="mt-6 pt-4 border-t border-border">
           <p className="text-xs text-muted-foreground">
-            {getProviderForModel(config.model) === "ollama"
+            {getProviderIdForModel(config.model) === "ollama"
               ? "Make sure Ollama is running locally"
               : "Your API keys are stored locally in your browser"}
           </p>
